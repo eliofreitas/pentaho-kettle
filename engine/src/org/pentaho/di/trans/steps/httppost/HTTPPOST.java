@@ -22,13 +22,17 @@
 
 package org.pentaho.di.trans.steps.httppost;
 
-import java.io.ByteArrayInputStream;
+import java.io.IOException;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.ByteArrayInputStream;
 import java.io.InputStreamReader;
+
+
 import java.net.UnknownHostException;
 
 import org.apache.commons.httpclient.Credentials;
+import org.apache.commons.httpclient.Header;
 import org.apache.commons.httpclient.HostConfiguration;
 import org.apache.commons.httpclient.HttpClient;
 import org.apache.commons.httpclient.NameValuePair;
@@ -36,6 +40,7 @@ import org.apache.commons.httpclient.UsernamePasswordCredentials;
 import org.apache.commons.httpclient.auth.AuthScope;
 import org.apache.commons.httpclient.methods.InputStreamRequestEntity;
 import org.apache.commons.httpclient.methods.PostMethod;
+import org.json.simple.JSONObject;
 import org.pentaho.di.cluster.SlaveConnectionManager;
 import org.pentaho.di.core.Const;
 import org.pentaho.di.core.exception.KettleException;
@@ -202,7 +207,7 @@ public class HTTPPOST extends BaseStep implements StepInterface {
         long startTime = System.currentTimeMillis();
 
         // Execute the POST method
-        int statusCode = HTTPPOSTclient.executeMethod( hostConfiguration, post );
+        int statusCode = requestStatusCode( post, hostConfiguration, HTTPPOSTclient );
 
         // calculate the responseTime
         long responseTime = System.currentTimeMillis() - startTime;
@@ -216,6 +221,7 @@ public class HTTPPOST extends BaseStep implements StepInterface {
           logDebug( BaseMessages.getString( PKG, "HTTPPOST.Log.ResponseCode", String.valueOf( statusCode ) ) );
         }
         String body = null;
+        String headerString = null;
         if ( statusCode != -1 ) {
           if ( statusCode == 204 ) {
             body = "";
@@ -223,6 +229,7 @@ public class HTTPPOST extends BaseStep implements StepInterface {
             // if the response is not 401: HTTP Authentication required
             if ( statusCode != 401 ) {
 
+              Header[] headers = searchForHeaders( post );
               // Use request encoding if specified in component to avoid strange response encodings
               // See PDI-3815
               String encoding = data.realEncoding;
@@ -235,20 +242,15 @@ public class HTTPPOST extends BaseStep implements StepInterface {
                   encoding = contentType.replaceFirst( "^.*;\\s*charset\\s*=\\s*", "" ).replace( "\"", "" ).trim();
                 }
               }
+              JSONObject json = new JSONObject();
+              for ( Header header : headers ) {
+                json.put( header.getName(), header.getValue() );
+              }
+              headerString = json.toJSONString();
 
               // Get the response, but only specify encoding if we've got one
               // otherwise the default charset ISO-8859-1 is used by HttpClient
-              if ( Const.isEmpty( encoding ) ) {
-                if ( isDebug() ) {
-                  logDebug( BaseMessages.getString( PKG, "HTTPPOST.Log.Encoding", "ISO-8859-1" ) );
-                }
-                inputStreamReader = new InputStreamReader( post.getResponseBodyAsStream() );
-              } else {
-                if ( isDebug() ) {
-                  logDebug( BaseMessages.getString( PKG, "HTTPPOST.Log.Encoding", encoding ) );
-                }
-                inputStreamReader = new InputStreamReader( post.getResponseBodyAsStream(), encoding );
-              }
+              inputStreamReader = openStream( encoding, post );
 
               StringBuilder bodyBuffer = new StringBuilder();
 
@@ -284,6 +286,9 @@ public class HTTPPOST extends BaseStep implements StepInterface {
         if ( !Const.isEmpty( meta.getResponseTimeFieldName() ) ) {
           newRow = RowDataUtil.addValueData( newRow, returnFieldsOffset, new Long( responseTime ) );
         }
+        if ( !Const.isEmpty( meta.getResponseHeaderFieldName() ) ) {
+          newRow = RowDataUtil.addValueData( newRow, returnFieldsOffset, headerString.toString() );
+        }
       } finally {
         if ( inputStreamReader != null ) {
           inputStreamReader.close();
@@ -306,6 +311,29 @@ public class HTTPPOST extends BaseStep implements StepInterface {
         BaseStep.closeQuietly( fis );
       }
     }
+  }
+
+  protected int requestStatusCode( PostMethod post, HostConfiguration hostConfiguration, HttpClient httppostclient ) throws IOException {
+    return httppostclient.executeMethod( hostConfiguration, post );
+  }
+
+  protected InputStreamReader openStream( String encoding, PostMethod post ) throws Exception {
+    if ( Const.isEmpty( encoding ) ) {
+      if ( isDebug() ) {
+        logDebug( BaseMessages.getString( PKG, "HTTPPOST.Log.Encoding", "ISO-8859-1" ) );
+      }
+      return new InputStreamReader( post.getResponseBodyAsStream() );
+    } else {
+      if ( isDebug() ) {
+        logDebug( BaseMessages.getString( PKG, "HTTPPOST.Log.Encoding", encoding ) );
+      }
+      return new InputStreamReader( post.getResponseBodyAsStream(), encoding );
+    }
+
+  }
+
+  protected Header[] searchForHeaders( PostMethod post ) {
+    return post.getResponseHeaders();
   }
 
   public boolean processRow( StepMetaInterface smi, StepDataInterface sdi ) throws KettleException {
