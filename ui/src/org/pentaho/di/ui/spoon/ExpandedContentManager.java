@@ -30,6 +30,7 @@ import org.eclipse.swt.dnd.TextTransfer;
 import org.eclipse.swt.dnd.Transfer;
 import org.eclipse.swt.events.KeyEvent;
 import org.eclipse.swt.events.KeyListener;
+import org.eclipse.swt.graphics.Device;
 import org.eclipse.swt.layout.FormAttachment;
 import org.eclipse.swt.layout.FormData;
 import org.eclipse.swt.widgets.Control;
@@ -120,8 +121,26 @@ public final class ExpandedContentManager {
         }
       } );
     }
-    browser.setUrl( url );
+
+    browser.setUrl( injectDPItoUrl( browser, url ) );
     browser.refresh();
+  }
+
+  private static String injectDPItoUrl(Browser browser, String url) {
+    String newUrl = "";
+    Device device = browser.getDisplay();
+    device.getDPI();
+    System.out.println("###########################################################" +
+        "DPI DPI DPI DPI DPI: " +
+        device.getDPI() +
+        "#########################################################");
+    String[] urlSplitted = url.split("&");
+    for (int i = 0; i < urlSplitted.length - 1; i++) {
+      newUrl = newUrl + urlSplitted[i] + "&";
+    }
+    newUrl = newUrl + "DPIX=" + device.getDPI().x +"&" + "DPIY=" + device.getDPI().y +"&" ;
+    newUrl = newUrl + urlSplitted[urlSplitted.length - 1];
+    return newUrl;
   }
 
   /**
