@@ -99,9 +99,6 @@ public final class ExpandedContentManager {
     }
     Browser browser = getExpandedContentForTransGraph( parent );
     if ( browser == null ) {
-      if ( environmentWarning( parent ) ) { // is the browser is not supported return
-        return;
-      }
       browser = new Browser( parent, SWT.NONE );
       browser.addKeyListener( new KeyListener() {
         @Override public void keyPressed( KeyEvent keyEvent ) {
@@ -244,45 +241,6 @@ public final class ExpandedContentManager {
 
   private static Spoon spoonInstance() {
     return spoonSupplier.get();
-  }
-
-  /**
-   * environmentWarning
-   *
-   * Shows a warning if the environment is unsupported.
-   *
-   * @param parent Parent Transformation of the browser.
-   * @return ´true´ if the warning was shown ´false' otherwise.
-   */
-  private static boolean environmentWarning( TransGraph parent ) {
-    if ( Spoon.isUnsupportedBrowserEnvironment() ) {
-      if ( Spoon.getAvailableBrowser().contains( EnvironmentUtils.WINDOWS_BROWSER ) ) {
-        environmentWarningDialog( parent, BrowserEnvironmentWarningDialog.EnvironmentCase.WINDOWS_THIN );
-        return true;
-      } else if ( Spoon.getAvailableBrowser().contains( EnvironmentUtils.MAC_BROWSER ) ) {
-        environmentWarningDialog( parent, BrowserEnvironmentWarningDialog.EnvironmentCase.MAC_OS_X_THIN );
-        return true;
-      }
-    }
-    if ( Spoon.isWebkitUnavailable() ) {
-      environmentWarningDialog( parent, BrowserEnvironmentWarningDialog.EnvironmentCase.UBUNTU_THIN );
-      return true;
-    }
-    return false;
-  }
-
-  /**
-   * environmentWarningDialog
-   *
-   * Shows a warning dialog if in a unsupported browser.
-   *
-   * @param parent The Parent composite of this dialog.
-   * @param environmentCase For which environment this dialog will be created.
-   */
-  private static void environmentWarningDialog( TransGraph parent,
-                                               BrowserEnvironmentWarningDialog.EnvironmentCase environmentCase ) {
-    ( new BrowserEnvironmentWarningDialog( parent.getShell() ) ).showWarningDialog(
-        environmentCase );
   }
 
   /**
